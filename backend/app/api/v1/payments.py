@@ -57,7 +57,7 @@ async def create_payme_checkout(
     if not _checkout_is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Payme subscription price, period, and merchant credentials are not configured",
+            detail="Payme obunasi uchun merchant ma’lumotlari, narx va muddat sozlanmagan",
         )
 
     payment = Payment(
@@ -263,6 +263,11 @@ async def _extend_subscription(
     period_days = settings.PAYME_SUBSCRIPTION_PERIOD_DAYS
     if not period_days:
         raise RuntimeError("Payme subscription period is not configured")
+    # Serialize all payments for one user before creating/updating the unique
+    # subscription row, including the first two callbacks arriving together.
+    await db.execute(
+        select(User.id).where(User.id == payment.user_id).with_for_update()
+    )
     result = await db.execute(
         select(Subscription)
         .where(Subscription.user_id == payment.user_id)

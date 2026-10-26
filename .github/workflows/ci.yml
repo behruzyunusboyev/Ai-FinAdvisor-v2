@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: finadvisor
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: finadvisor_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finadvisor -d finadvisor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://finadvisor:ci-only-password@localhost:5432/finadvisor_test
+      SECRET_KEY: ci-only-secret-key-not-for-production
+      UZB_VAT_RATE: "12"
+      UZB_PROFIT_TAX_RATE: "15"
+      UZB_INCOME_TAX_RATE: "12"
+      UZB_SOCIAL_TAX_RATE: "12"
+      UZB_TURNOVER_TAX_RATE: "4"
+      UZB_SIMPLIFIED_VAT_RATE: "6"
+      UZB_BASE_CALCULATION_AMOUNT: "440000"
+      UZB_TURNOVER_TAX_LIMIT_BHM: "12000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m pytest -q
+      - run: python -m alembic upgrade head
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm run build
+      - name: Prepare standalone assets for E2E
+        run: |
+          mkdir -p .next/standalone/.next
+          cp -R .next/static .next/standalone/.next/static
+          if [ -d public ]; then cp -R public .next/standalone/public; fi
+      - name: Start production server
+        run: HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js > /tmp/finadvisor-next.log 2>&1 &
+      - name: Wait for production server
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/finadvisor-next.log
+          exit 1
+      - run: npm run e2e:ci

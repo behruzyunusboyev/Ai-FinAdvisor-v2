@@ -94,7 +94,7 @@ def calculate_readiness_score(
         status="completeness_only",
         note=(
             "Bu ball faqat loyiha moliyaviy ma’lumotlarining to‘liqligini "
-            "ko‘rsatadi; bankning kredit qarori yoki tasdiqlash ehtimoli emas."
+            "ko‘rsatadi; bu bank kredit qarori emas va tasdiqlash ehtimolini bildirmaydi."
         ),
         components=components,
     )

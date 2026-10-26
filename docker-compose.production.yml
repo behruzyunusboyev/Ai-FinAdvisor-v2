@@ -1,0 +1,98 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS to the HTTPS site origin}
+      UZB_VAT_RATE: ${UZB_VAT_RATE:?Set UZB_VAT_RATE}
+      UZB_PROFIT_TAX_RATE: ${UZB_PROFIT_TAX_RATE:?Set UZB_PROFIT_TAX_RATE}
+      UZB_INCOME_TAX_RATE: ${UZB_INCOME_TAX_RATE:?Set UZB_INCOME_TAX_RATE}
+      UZB_SOCIAL_TAX_RATE: ${UZB_SOCIAL_TAX_RATE:?Set UZB_SOCIAL_TAX_RATE}
+      UZB_TURNOVER_TAX_RATE: ${UZB_TURNOVER_TAX_RATE:?Set UZB_TURNOVER_TAX_RATE}
+      UZB_SIMPLIFIED_VAT_RATE: ${UZB_SIMPLIFIED_VAT_RATE:?Set UZB_SIMPLIFIED_VAT_RATE}
+      UZB_BASE_CALCULATION_AMOUNT: ${UZB_BASE_CALCULATION_AMOUNT:?Set UZB_BASE_CALCULATION_AMOUNT}
+      UZB_TURNOVER_TAX_LIMIT_BHM: ${UZB_TURNOVER_TAX_LIMIT_BHM:?Set UZB_TURNOVER_TAX_LIMIT_BHM}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      PAYME_MERCHANT_ID: ${PAYME_MERCHANT_ID:-}
+      PAYME_MERCHANT_LOGIN: ${PAYME_MERCHANT_LOGIN:-}
+      PAYME_MERCHANT_KEY: ${PAYME_MERCHANT_KEY:-}
+      PAYME_SUBSCRIPTION_PRICE_TIYIN: ${PAYME_SUBSCRIPTION_PRICE_TIYIN:-}
+      PAYME_SUBSCRIPTION_PERIOD_DAYS: ${PAYME_SUBSCRIPTION_PERIOD_DAYS:-}
+      PAYME_SUBSCRIPTION_PLAN_CODE: ${PAYME_SUBSCRIPTION_PLAN_CODE:-configured}
+      PAYME_CHECKOUT_URL: ${PAYME_CHECKOUT_URL:-https://checkout.paycom.uz}
+      PAYME_RETURN_URL: ${PAYME_RETURN_URL:-}
+      READINESS_WEIGHT_CAPEX: ${READINESS_WEIGHT_CAPEX:-10}
+      READINESS_WEIGHT_OPEX: ${READINESS_WEIGHT_OPEX:-20}
+      READINESS_WEIGHT_SALES_TAX: ${READINESS_WEIGHT_SALES_TAX:-20}
+      READINESS_WEIGHT_INVESTMENT_ROI: ${READINESS_WEIGHT_INVESTMENT_ROI:-20}
+      READINESS_WEIGHT_LOAN: ${READINESS_WEIGHT_LOAN:-20}
+      READINESS_WEIGHT_TAX_OUTPUT: ${READINESS_WEIGHT_TAX_OUTPUT:-10}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.production
+      args:
+        NEXT_PUBLIC_API_URL: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/finadvisor.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:

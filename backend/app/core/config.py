@@ -80,6 +80,18 @@ class Settings(BaseSettings):
     PAYME_CHECKOUT_URL: str = "https://checkout.paycom.uz"
     PAYME_RETURN_URL: str | None = None
 
+    @field_validator(
+        "PAYME_SUBSCRIPTION_PRICE_TIYIN",
+        "PAYME_SUBSCRIPTION_PERIOD_DAYS",
+        mode="before",
+    )
+    @classmethod
+    def blank_payme_numbers_are_unset(cls, value: object) -> object:
+        """Treat empty .env placeholders as unset instead of invalid integers."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     # Internal completeness rubric; these weights describe product policy,
     # not lender approval criteria, and must total 100 points.
     READINESS_WEIGHT_CAPEX: int = 10

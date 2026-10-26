@@ -64,7 +64,7 @@ def calculate_break_even(
             raise ValueError(f"menu_items[{index}].name must be a non-empty string")
         if isinstance(units, bool) or not isinstance(units, int) or units < 0:
             raise ValueError(
-                f"menu_items[{index}].expected_monthly_units must be a "
+                f"menu_items[{index}].expected monthly sales units must be a "
                 "non-negative integer"
             )
         normalized_items.append(
@@ -84,7 +84,7 @@ def calculate_break_even(
         units = item.expected_monthly_units
         if isinstance(units, bool) or not isinstance(units, int) or units < 0:
             raise ValueError(
-                f"menu_items[{index}].expected_monthly_units must be a "
+                f"menu_items[{index}].expected monthly sales units must be a "
                 "non-negative integer"
             )
     if len({item.name for item in normalized_items}) != len(normalized_items):

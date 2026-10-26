@@ -16,6 +16,10 @@ Configure these backend environment variables before enabling checkout:
 - `PAYME_CHECKOUT_URL`: production checkout URL; use the test URL in sandbox.
 - `PAYME_RETURN_URL`: optional browser return URL after checkout.
 
+For Docker Compose deployments, set the same values in the project-root `.env`;
+Compose passes them through to the backend container. The root `.env.example`
+contains empty Payme placeholders and can be copied before configuration.
+
 Apply database migrations with `alembic upgrade head` from the backend project.
 Register `POST https://<backend-host>/api/v1/payments/payme` as the Payme
 Merchant API endpoint. The authenticated application endpoint
